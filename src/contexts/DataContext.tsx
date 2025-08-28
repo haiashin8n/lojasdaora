@@ -185,24 +185,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const processPayment = (paymentId: string, amount: number) => {
-    setCreditPayments(prev => prev.map(payment => {
-      if (payment.id === paymentId) {
-        const newPaidAmount = payment.paidAmount + amount;
-        const newStatus = newPaidAmount >= payment.totalAmount ? 'pago' : 'pendente';
+    const payment = creditPayments.find(p => p.id === paymentId);
+    if (!payment) {
+      throw new Error('Pagamento não encontrado');
+    }
+
+    if (amount <= 0) {
+      throw new Error('Valor do pagamento deve ser maior que zero');
+    }
+
+    const remaining = payment.totalAmount - payment.paidAmount;
+    if (amount > remaining) {
+      throw new Error('Valor do pagamento maior que o débito pendente');
+    }
+
+    setCreditPayments(prev => prev.map(p => {
+      if (p.id === paymentId) {
+        const newPaidAmount = p.paidAmount + amount;
+        const newStatus = newPaidAmount >= p.totalAmount ? 'pago' : p.status;
         return {
-          ...payment,
+          ...p,
           paidAmount: newPaidAmount,
           status: newStatus,
-          currentInstallment: Math.ceil((newPaidAmount / payment.totalAmount) * payment.installments)
+          currentInstallment: Math.ceil((newPaidAmount / p.totalAmount) * p.installments),
+          lastPaymentDate: new Date()
         };
       }
-      return payment;
+      return p;
     }));
 
     // Atualizar saldo do cliente
     setCustomers(prev => prev.map(customer => {
-      const customerPayment = creditPayments.find(p => p.id === paymentId);
-      if (customerPayment && customer.id === customerPayment.customerId) {
+      if (customer.id === payment.customerId) {
         return {
           ...customer,
           currentDebt: Math.max(0, customer.currentDebt - amount)
@@ -212,10 +226,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
 
     // Atualizar caixa
+    if (!cashStatus.isOpen) {
+      throw new Error('O caixa precisa estar aberto para receber pagamentos');
+    }
+
     setCashStatus(prev => ({
       ...prev,
       currentAmount: prev.currentAmount + amount
     }));
+  };
   };
 
   const getCreditPaymentsByCustomer = (customerId: string) => {

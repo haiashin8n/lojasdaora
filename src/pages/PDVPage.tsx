@@ -3,6 +3,8 @@ import { Plus, Minus, ShoppingCart, DollarSign, CreditCard, Banknote, QrCode, Ca
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface CartItem {
   productId: string;
@@ -36,12 +38,13 @@ function PDVPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'dinheiro' | 'cartao' | 'crediario'>('dinheiro');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [showCashModal, setShowCashModal] = useState(false);
-  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
-  const [showReceivePaymentModal, setShowReceivePaymentModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState('');
+const [showCashModal, setShowCashModal] = useState(false);
+const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+const [showReceivePaymentModal, setShowReceivePaymentModal] = useState(false);
+const [searchQuery, setSearchQuery] = useState('');
+const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+const [paymentAmount, setPaymentAmount] = useState('');
+const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<CreditPayment | null>(null);
   const [customerData, setCustomerData] = useState<CustomerData>({ name: '', phone: '', email: '' });
   const [cashAmount, setCashAmount] = useState('');
@@ -192,6 +195,7 @@ function PDVPage() {
               <button
                 onClick={() => setShowReceivePaymentModal(true)}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
+                disabled={!cashStatus.isOpen}
               >
                 <Receipt className="h-4 w-4 mr-2" />
                 Receber Crediário

@@ -25,12 +25,12 @@ function AdminDashboard() {
   }, {});
 
   const cashFlowData = [
-    { month: 'Jan', entradas: 45000, saidas: 32000, crediario: creditPaymentsByMonth['jan'] || 0 },
-    { month: 'Fev', entradas: 52000, saidas: 38000, crediario: creditPaymentsByMonth['fev'] || 0 },
-    { month: 'Mar', entradas: 48000, saidas: 35000, crediario: creditPaymentsByMonth['mar'] || 0 },
-    { month: 'Abr', entradas: 61000, saidas: 42000, crediario: creditPaymentsByMonth['abr'] || 0 },
-    { month: 'Mai', entradas: 55000, saidas: 39000, crediario: creditPaymentsByMonth['mai'] || 0 },
-    { month: 'Jun', entradas: 67000, saidas: 45000, crediario: creditPaymentsByMonth['jun'] || 0 }
+    { month: 'Jan', vendas: 45000, saidas: 32000, crediario: creditPaymentsByMonth['jan'] || 0 },
+    { month: 'Fev', vendas: 52000, saidas: 38000, crediario: creditPaymentsByMonth['fev'] || 0 },
+    { month: 'Mar', vendas: 48000, saidas: 35000, crediario: creditPaymentsByMonth['mar'] || 0 },
+    { month: 'Abr', vendas: 61000, saidas: 42000, crediario: creditPaymentsByMonth['abr'] || 0 },
+    { month: 'Mai', vendas: 55000, saidas: 39000, crediario: creditPaymentsByMonth['mai'] || 0 },
+    { month: 'Jun', vendas: 67000, saidas: 45000, crediario: creditPaymentsByMonth['jun'] || 0 }
   ];
 
   const handleWhatsAppReminder = (customerName: string) => {
@@ -38,8 +38,9 @@ function AdminDashboard() {
   };
 
   // Calcula o faturamento total (vendas + pagamentos de crediário)
-  const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0) + 
-    creditPayments.reduce((sum, payment) => sum + payment.paidAmount, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalCreditPayments = creditPayments.reduce((sum, payment) => sum + payment.paidAmount, 0);
+  const totalRevenue = totalSales + totalCreditPayments;
   const totalCustomers = customers.length;
   const overduePayments = creditPayments.filter(p => p.status === 'vencido').length;
 
