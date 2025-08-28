@@ -49,6 +49,9 @@ interface DataContextType {
   addSale: (sale: Omit<Sale, 'id' | 'date'>) => void;
   addCustomer: (customer: Omit<Customer, 'id'>) => void;
   addCreditPayment: (payment: Omit<CreditPayment, 'id'>) => void;
+  processPayment: (paymentId: string, amount: number) => void;
+  getCreditPaymentsByCustomer: (customerId: string) => CreditPayment[];
+  searchCustomers: (query: string) => Customer[];
   cashStatus: { isOpen: boolean; openingAmount: number; currentAmount: number };
   openCash: (amount: number) => void;
   closeCash: () => void;
@@ -181,6 +184,54 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const processPayment = (paymentId: string, amount: number) => {
+    setCreditPayments(prev => prev.map(payment => {
+      if (payment.id === paymentId) {
+        const newPaidAmount = payment.paidAmount + amount;
+        const newStatus = newPaidAmount >= payment.totalAmount ? 'pago' : 'pendente';
+        return {
+          ...payment,
+          paidAmount: newPaidAmount,
+          status: newStatus,
+          currentInstallment: Math.ceil((newPaidAmount / payment.totalAmount) * payment.installments)
+        };
+      }
+      return payment;
+    }));
+
+    // Atualizar saldo do cliente
+    setCustomers(prev => prev.map(customer => {
+      const customerPayment = creditPayments.find(p => p.id === paymentId);
+      if (customerPayment && customer.id === customerPayment.customerId) {
+        return {
+          ...customer,
+          currentDebt: Math.max(0, customer.currentDebt - amount)
+        };
+      }
+      return customer;
+    }));
+
+    // Atualizar caixa
+    setCashStatus(prev => ({
+      ...prev,
+      currentAmount: prev.currentAmount + amount
+    }));
+  };
+
+  const getCreditPaymentsByCustomer = (customerId: string) => {
+    return creditPayments.filter(payment => 
+      payment.customerId === customerId && payment.status !== 'pago'
+    );
+  };
+
+  const searchCustomers = (query: string) => {
+    const normalizedQuery = query.toLowerCase();
+    return customers.filter(customer =>
+      customer.name.toLowerCase().includes(normalizedQuery) ||
+      customer.phone.includes(query)
+    );
+  };
+
   return (
     <DataContext.Provider value={{
       products,
@@ -190,6 +241,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addSale,
       addCustomer,
       addCreditPayment,
+      processPayment,
+      getCreditPaymentsByCustomer,
+      searchCustomers,
       cashStatus,
       openCash,
       closeCash,

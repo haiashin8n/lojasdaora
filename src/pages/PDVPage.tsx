@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Minus, ShoppingCart, DollarSign, CreditCard, Banknote, QrCode, Calculator, User } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, DollarSign, CreditCard, Banknote, QrCode, Calculator, User, Search, Receipt } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -18,13 +18,31 @@ interface CustomerData {
 }
 
 function PDVPage() {
-  const { products, addSale, addCustomer, customers, cashStatus, openCash, closeCash, makeCashWithdrawal } = useData();
+  const { 
+    products, 
+    addSale, 
+    addCustomer, 
+    customers, 
+    cashStatus, 
+    openCash, 
+    closeCash, 
+    makeCashWithdrawal,
+    searchCustomers,
+    getCreditPaymentsByCustomer,
+    processPayment,
+    creditPayments
+  } = useData();
   const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'dinheiro' | 'cartao' | 'crediario'>('dinheiro');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [showReceivePaymentModal, setShowReceivePaymentModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [selectedPayment, setSelectedPayment] = useState<CreditPayment | null>(null);
   const [customerData, setCustomerData] = useState<CustomerData>({ name: '', phone: '', email: '' });
   const [cashAmount, setCashAmount] = useState('');
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
@@ -171,6 +189,13 @@ function PDVPage() {
             </button>
           ) : (
             <>
+              <button
+                onClick={() => setShowReceivePaymentModal(true)}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
+              >
+                <Receipt className="h-4 w-4 mr-2" />
+                Receber Crediário
+              </button>
               <button
                 onClick={() => setShowWithdrawalModal(true)}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors"
@@ -398,6 +423,161 @@ function PDVPage() {
                 className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg transition-colors"
               >
                 Abrir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Receber Pagamento */}
+      {showReceivePaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Receber Pagamento de Crediário</h3>
+            
+            {!selectedCustomer ? (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente por nome ou telefone"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    <Search className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {searchQuery && (
+                  <div className="max-h-60 overflow-y-auto border rounded-lg divide-y">
+                    {searchCustomers(searchQuery).map(customer => (
+                      <button
+                        key={customer.id}
+                        onClick={() => setSelectedCustomer(customer)}
+                        className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex justify-between items-center"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">{customer.name}</p>
+                          <p className="text-sm text-gray-600">{customer.phone}</p>
+                        </div>
+                        <span className="text-orange-600 font-medium">
+                          R$ {customer.currentDebt.toFixed(2)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h4 className="font-medium text-gray-900">{selectedCustomer.name}</h4>
+                    <p className="text-sm text-gray-600">{selectedCustomer.phone}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedCustomer(null);
+                      setSelectedPayment(null);
+                      setPaymentAmount('');
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    Voltar à busca
+                  </button>
+                </div>
+
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <h5 className="font-medium text-gray-900 mb-3">Parcelas Pendentes</h5>
+                  <div className="space-y-3">
+                    {getCreditPaymentsByCustomer(selectedCustomer.id).map(payment => (
+                      <div
+                        key={payment.id}
+                        className={`p-3 rounded-lg border ${selectedPayment?.id === payment.id ? 'border-orange-500 bg-orange-50' : 'border-gray-200'} cursor-pointer`}
+                        onClick={() => setSelectedPayment(payment)}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-gray-900">
+                            Parcela {payment.currentInstallment} de {payment.installments}
+                          </span>
+                          <span className={`text-sm font-medium ${payment.status === 'vencido' ? 'text-red-600' : 'text-gray-600'}`}>
+                            {payment.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Vencimento: {payment.dueDate.toLocaleDateString()}</span>
+                          <span className="text-gray-900 font-medium">
+                            R$ {(payment.totalAmount - payment.paidAmount).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedPayment && (
+                  <div className="border-t pt-4 mt-4">
+                    <div className="flex gap-4 items-end">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Valor do Pagamento
+                        </label>
+                        <input
+                          type="number"
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          placeholder="0,00"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const amount = parseFloat(paymentAmount);
+                          if (isNaN(amount) || amount <= 0) {
+                            toast.error('Valor inválido');
+                            return;
+                          }
+                          const remaining = selectedPayment.totalAmount - selectedPayment.paidAmount;
+                          if (amount > remaining) {
+                            toast.error('Valor maior que o débito pendente');
+                            return;
+                          }
+                          processPayment(selectedPayment.id, amount);
+                          toast.success('Pagamento registrado com sucesso!');
+                          setShowReceivePaymentModal(false);
+                          setSelectedCustomer(null);
+                          setSelectedPayment(null);
+                          setPaymentAmount('');
+                          setSearchQuery('');
+                        }}
+                        disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
+                        className="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-6 py-3 rounded-lg transition-colors"
+                      >
+                        Confirmar Pagamento
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => {
+                  setShowReceivePaymentModal(false);
+                  setSelectedCustomer(null);
+                  setSelectedPayment(null);
+                  setPaymentAmount('');
+                  setSearchQuery('');
+                }}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Fechar
               </button>
             </div>
           </div>

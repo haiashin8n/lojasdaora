@@ -5,7 +5,8 @@ import { useData } from '../contexts/DataContext';
 import { toast } from 'sonner';
 
 function AdminDashboard() {
-  const { customers, creditPayments, sales } = useData();
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'pagos' | 'pendentes' | 'vencidos'>('todos');
+  const { customers, creditPayments, sales, getCreditPaymentsByCustomer } = useData();
 
   // Dados para gráficos
   const salesData = [
@@ -16,20 +17,29 @@ function AdminDashboard() {
     { name: 'Pedro', vendas: 18 }
   ];
 
+  // Agrupa pagamentos de crediário por mês
+  const creditPaymentsByMonth = creditPayments.reduce((acc, payment) => {
+    const month = payment.dueDate.toLocaleString('pt-BR', { month: 'short' });
+    acc[month] = (acc[month] || 0) + payment.paidAmount;
+    return acc;
+  }, {});
+
   const cashFlowData = [
-    { month: 'Jan', entradas: 45000, saidas: 32000 },
-    { month: 'Fev', entradas: 52000, saidas: 38000 },
-    { month: 'Mar', entradas: 48000, saidas: 35000 },
-    { month: 'Abr', entradas: 61000, saidas: 42000 },
-    { month: 'Mai', entradas: 55000, saidas: 39000 },
-    { month: 'Jun', entradas: 67000, saidas: 45000 }
+    { month: 'Jan', entradas: 45000, saidas: 32000, crediario: creditPaymentsByMonth['jan'] || 0 },
+    { month: 'Fev', entradas: 52000, saidas: 38000, crediario: creditPaymentsByMonth['fev'] || 0 },
+    { month: 'Mar', entradas: 48000, saidas: 35000, crediario: creditPaymentsByMonth['mar'] || 0 },
+    { month: 'Abr', entradas: 61000, saidas: 42000, crediario: creditPaymentsByMonth['abr'] || 0 },
+    { month: 'Mai', entradas: 55000, saidas: 39000, crediario: creditPaymentsByMonth['mai'] || 0 },
+    { month: 'Jun', entradas: 67000, saidas: 45000, crediario: creditPaymentsByMonth['jun'] || 0 }
   ];
 
   const handleWhatsAppReminder = (customerName: string) => {
     toast.success(`Lembrete enviado via WhatsApp para ${customerName}!`);
   };
 
-  const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
+  // Calcula o faturamento total (vendas + pagamentos de crediário)
+  const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0) + 
+    creditPayments.reduce((sum, payment) => sum + payment.paidAmount, 0);
   const totalCustomers = customers.length;
   const overduePayments = creditPayments.filter(p => p.status === 'vencido').length;
 
@@ -118,6 +128,7 @@ function AdminDashboard() {
               <Tooltip />
               <Line type="monotone" dataKey="entradas" stroke="#10b981" strokeWidth={2} />
               <Line type="monotone" dataKey="saidas" stroke="#ef4444" strokeWidth={2} />
+              <Line type="monotone" dataKey="crediario" stroke="#8b5cf6" strokeWidth={2} name="Recebimentos Crediário" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -125,6 +136,35 @@ function AdminDashboard() {
 
       {/* Status dos Crediários */}
       <div className="bg-white rounded-xl shadow-sm border border-orange-100">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-gray-900">Status dos Crediários</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setStatusFilter('todos')}
+              className={`px-4 py-2 rounded-lg transition-colors ${statusFilter === 'todos' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setStatusFilter('pagos')}
+              className={`px-4 py-2 rounded-lg transition-colors ${statusFilter === 'pagos' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Pagos
+            </button>
+            <button
+              onClick={() => setStatusFilter('pendentes')}
+              className={`px-4 py-2 rounded-lg transition-colors ${statusFilter === 'pendentes' ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Pendentes
+            </button>
+            <button
+              onClick={() => setStatusFilter('vencidos')}
+              className={`px-4 py-2 rounded-lg transition-colors ${statusFilter === 'vencidos' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Vencidos
+            </button>
+          </div>
+        </div>
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Status dos Crediários</h2>
         </div>
@@ -136,14 +176,31 @@ function AdminDashboard() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Vencido</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próximo Vencimento</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Futuro</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Pagamento</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {creditPayments.slice(0, 8).map((payment) => {
+              {creditPayments
+                .filter(payment => {
+                  switch (statusFilter) {
+                    case 'pagos':
+                      return payment.status === 'pago';
+                    case 'pendentes':
+                      return payment.status === 'pendente';
+                    case 'vencidos':
+                      return payment.status === 'vencido';
+                    default:
+                      return true;
+                  }
+                })
+                .sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime())
+                .slice(0, 8)
+                .map((payment) => {
                 const customer = customers.find(c => c.id === payment.customerId);
                 const valorVencido = payment.status === 'vencido' ? payment.totalAmount - payment.paidAmount : 0;
+                const ultimoPagamento = payment.paidAmount > 0 ? payment.lastPaymentDate?.toLocaleDateString('pt-BR') : 'Nenhum';
                 const valorFuturo = payment.totalAmount - payment.paidAmount;
                 
                 return (
@@ -159,6 +216,9 @@ function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       R$ {valorFuturo.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {ultimoPagamento}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
