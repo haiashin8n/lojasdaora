@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "node",
+      "args": ["mcp-wrapper.js"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "firecrawl-mcp": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp", "--api-key", "${ctx7sk-1998b320-0aa8-438b-a03c-0f7c7d10ef9e}"]
+    },
+    "@magicuidesign/mcp": {
+      "command": "npx",
+      "args": ["-y", "@magicuidesign/mcp@latest"]
+    }
+  }
+}
+
